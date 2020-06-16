@@ -1,0 +1,103 @@
+#!/usr/bin/env perl
+
+#
+# Pretends to be docker-compose by regenerating a temp docker-compose file,
+# and then passing that through to real docker-compose
+#
+
+use strict;
+use warnings;
+use lib 'docker';
+
+use DockerConfig qw/$config/;
+use File::Temp qw/tempfile/;
+use YAML qw/Dump/;
+use Cwd qw/getcwd/;
+
+my ( $compose_fh, $compose_filename ) = tempfile();
+my $primary = $ARGV[0];
+
+write_compose_file();
+
+my @command = ( 'docker-compose', '-f', $compose_filename, @ARGV );
+
+# This is the only bit where we don't basically pretend to be the original
+# command -- a shortcut for getting a shell on the target box
+if ( $primary eq 'shell' ) {
+    my $target = $ARGV[1] || 'peter-frontend';
+    @command = splice( @command, 0, 3 );
+    push( @command, 'exec', '--user=root', $target, 'ash');
+}
+
+my $debug_cmd_string = join ' ', @command;
+print $debug_cmd_string . "\n";
+
+# exec never returns
+exec(@command);
+
+sub write_compose_file {
+    local $YAML::QuoteNumericStrings = 1;
+    my $ignore = $YAML::QuoteNumericStrings; # Shutup warnings
+    my $contents = {
+        version  => '3.7',
+        networks => { 'peter-net' => {} },
+        services => {}
+    };
+
+    my $port_mapper = 5001;
+
+    my $services = $config->{'services'};
+    for my $service_name ( sort keys %$services ) {
+        my $service         = $services->{$service_name};
+        my $task_name       = $service->{'task'};
+        my $task_definition = $config->{'tasks'}->{$task_name};
+
+        my $compose_service = { networks => ['peter-net'] };
+        $contents->{'services'}->{$service_name} = $compose_service;
+
+        $compose_service->{'image'} = $task_definition->{'image'};
+
+        my @volumes = @{ $task_definition->{'dev_mount'} // [] };
+        $compose_service->{'volumes'} = [];
+        for my $volume (@volumes) {
+            my ( $from, $to ) = split( /\:/, $volume );
+            $from =~ s/^\./getcwd/e;
+            push( @{ $compose_service->{'volumes'} }, "$from:$to" );
+        }
+
+        # Open up a local port for every one the task is exposing
+        $compose_service->{'ports'} = [];
+        for my $port ( @{ $task_definition->{'ports'} } ) {
+            my ( $from, $to ) = split( /\:/, $port );
+            $to //= $port_mapper++;
+
+            push(
+                @{ $compose_service->{'ports'} },
+                {   target    => 0 + $from,
+                    published => $to,
+                }
+            );
+
+            print "\t$service_name: $from:$to\n" if
+                ($primary eq 'up' || $primary eq 'start');
+        }
+
+        # Map over ENV values
+        $compose_service->{'environment'} = [];
+        for my $env ( @{ $task_definition->{'environment'} } ) {
+            push(
+                @{ $compose_service->{'environment'} },
+                $env->{'name'} . '=' . $env->{'value'}
+            );
+        }
+
+        # Add in http auth
+        for my $key ( keys %{ $config->{'http_auth'} } ) {
+            my $full_key = 'PETER_AUTH_' . uc($key);
+            push( @{ $compose_service->{'environment'} },
+                "$full_key=" . $config->{'http_auth'}->{$key} );
+        }
+    }
+
+    print $compose_fh Dump($contents);
+}
