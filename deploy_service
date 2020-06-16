@@ -1,0 +1,116 @@
+#!/usr/bin/env perl
+
+#
+# docker/deploy_service servicename
+#
+#   Ask AWS to use the latest container for a given service/task. The service
+#   name needs to exist in machine.yaml. While this process will be kicked
+#   off straight away, it can take a while for ECS to turn off the old
+#   containers.
+#
+
+#
+# The process of releasing on AWS is:
+#   * Create a new version of the task definition using
+#       `register-task-definition`. This will cause the latest container to
+#       be picked up
+#   * Call `update-service` with the new version of the task definition
+#
+
+use strict;
+use warnings;
+use lib 'docker';
+
+use JSON::XS qw/decode_json/;
+use TaskDefinition;
+use DockerConfig qw/$config/;
+use Cwd;
+
+#
+# Read all the pieces of config we need from the service name
+#
+
+my $service_name = $ARGV[0]
+    || die "Usage: docker/deploy_service servicename";
+
+my $service_config = $config->{'services'}->{$service_name}
+    || die "Can't find service [$service_name]";
+
+die "[$service_name] is a local only service"
+    if $service_config->{'development_only'};
+
+my $task_name   = $service_config->{'task'};
+my $task_config = $config->{'tasks'}->{$task_name}
+    || die "Can't find task [$task_name]";
+
+my $task_definition = TaskDefinition->new(
+    registry => $config->{'registry'},
+    family   => $task_name,
+    auth     => $config->{'http_auth'},
+    %$task_config,
+);
+
+my $task_definition_file = $task_definition->write_to_file();
+
+#
+# Create the updated task definition in AWS
+#
+
+print "Deploying an updated task definition\n";
+
+my $task_log = run_aws( 'register-task-definition',
+    ( region => 'eu-west-1' ),
+    ( profile           => 'prod' ),
+    ( 'cli-input-json' => "file://$task_definition_file" ) );
+
+my $revision = $task_log->{'taskDefinition'}->{'revision'};
+print "\tCreated $task_name revision $revision\n\n";
+
+#
+# Ask AWS to update the service with the new task definition
+#
+
+print "Requesting a new deployment of the service\n";
+
+my $service_log = run_aws(
+    'update-service',
+    ( region => 'eu-west-1' ),
+    ( profile           => 'prod' ),
+    ( service           => $service_name ),
+    ( 'task-definition' => $task_name ),
+    ( cluster           => 'peter' )
+);
+
+my $deployment      = $service_log->{'service'}->{'deployments'}->[0];
+my $deployment_id   = $deployment->{'id'};
+my $deployment_task = $deployment->{'taskDefinition'};
+print "\tDeployed $service_name [$deployment_id] with [$deployment_task]\n\n";
+
+exit(0);
+
+#
+# Run AWS command and parse the JSON output
+#
+
+sub run_aws {
+    my ( $aws_ecs_cmd, %options ) = @_;
+
+    # Build up an array of command
+    my @command = ( aws => ecs => $aws_ecs_cmd );
+    for my $option ( sort keys %options ) {
+        push( @command, '--' . $option );
+        push( @command, $options{$option} );
+    }
+
+    # Make that a string
+    my $cmd_string = join ' ', @command;
+
+    print "\t$cmd_string\n";
+    my $output = `$cmd_string`;
+    my $result = eval { decode_json $output };
+    unless ($result) {
+        die "That didn't return JSON :-/ Output: $output";
+    }
+
+    return $result;
+}
