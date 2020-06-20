@@ -1,26 +1,36 @@
-#!/usr/bin/env perl
+package App::adet::Cmd::Images;
 
 #
-# Create the toys and front-end:
-#   ./docker/images build [images]
+# Build, pull, and push images
 #
-# Download the toys and front-end from AWS:
-#   ./docker/images pull [images]
-#
-# Print out the commands you would need to push images to AWS; image required
-#   ./docker/images push IMAGENAME
-#
-# If you don't specify `images`, it'll use all, which is probably what you
-# want.
 
-use strict;
-use warnings;
-use utf8;
-use Getopt::Mini;
-use Path::Class;
-use YAML qw/LoadFile/;
-use Config::INI::Reader;
-use Cwd::Guard qw/cwd_guard/;
+
+use Moo;
+use MooX::Cmd;
+use MooX::Options;
+
+sub execute {
+    my ( $self, $args ) = @_;
+    my $arg = $args->[0];
+    my $pre_message
+        = $arg
+        ? "Unknown images subcommand [$arg]"
+        : "Please specify an images subcommand";
+    $self->options_usage( 1, $pre_message );
+}
+
+1;
+
+__DATA__
+
+# use strict;
+# use warnings;
+# use utf8;
+# use Getopt::Mini;
+# use Path::Class;
+# use YAML qw/LoadFile/;
+# use Config::INI::Reader;
+# use Cwd::Guard qw/cwd_guard/;
 
 my $config = LoadFile('docker/peter.yaml');
 my $profile = $ARGV{'profile'} || 'prod';
