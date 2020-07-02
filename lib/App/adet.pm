@@ -1,28 +1,53 @@
 package App::adet;
-use Moo;
-use MooX::Cmd;
-use MooX::Options;
+use strict;
+use warnings;
 
-option 'projectfile' => (
-    short   => 'f',
-    is      => 'ro',
-    format  => 's',
-    doc     => 'Location of the project file',
-    default => undef,
-);
+use Module::Runtime qw/require_module/;
+use App::adet::UI;
+use App::adet::Commands;
+use App::adet::ProjectFile
 
-option 'aws_profile' => (
-    short  => 'a',
-    is     => 'ro',
-    format => 's',
-    doc    => 'AWS Profile',
-);
+    our $VERSION = '0.0.1';
 
-sub execute {
-    my ( $self, $args ) = @_;
-    my $arg = $args->[0];
-    my $pre_message = $arg ? "Unknown subcommand [$arg]" : "Please specify a subcommand";
-    $self->options_usage(1, $pre_message);
+sub run {
+    my ( $class, $ui ) = @_;
+
+    my $command_class = $ui->command_class;
+    unless ($command_class) {
+        ($command_class)
+            = App::adet::Commands->find_command( $ui->command,
+            $ui->usage_callback );
+    }
+
+    # Load the command we're targetting
+    require_module $command_class;
+
+    # Check it accepts arguments if we have some
+    if ( @{ $ui->arguments } && !$command_class->accepts_arguments ) {
+        $ui->usage("This subcommand doesn't accept extra arguments");
+    }
+
+    # Load in options from project file
+    my $project = App::adet::ProjectFile->load(
+
+        # The project file we're trying to load
+        $ui->options->value('projectfile'),
+
+        # Where to add options
+        $ui->options,
+
+        # Where to add extra envs
+        $ui->env
+    );
+
+    $command_class->new_and_run(
+        arguments => $ui->arguments,
+        options   => $ui->options,
+        env       => $ui->env,
+        project   => $project,
+        usage_cb  => $ui->usage_callback,
+        log_cb    => $ui->log_callback
+    );
 }
 
 1;

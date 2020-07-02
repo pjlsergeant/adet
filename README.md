@@ -1,24 +1,87 @@
 
-# adet - App::Docker::ECS::Tools
+# adet - Drive docker, docker-compose, and aws ecs from one config
 
-Control local containers and ECS deployments from a central YAML file
+`adet` attempts to provide maximum DWIM for projects using docker, Docker
+Compose and AWS ECS from YAML configuration files. It supports the three
+projects I'm working on nicely, each one of which has several component
+Docker images organized into tasks and services, and deployed on ECS.
 
-## compose
+## Synopsis
 
-Writes a `docker-compose` file from the YAML input and then runs it
+### Login
 
-## deploy_service
+Config:
 
-Runs `register-task-definition` and `update_service`
+    version: 0.01
+    registry: 012345678901.dkr.ecr.eu-west-1.amazonaws.com
+    defaults:
+      aws_profile: osc
 
-## images
+Allows:
 
-`push`, `build`, and `pull` docker images
+    $ adet login https://012345678901.dkr.ecr.eu-west-1.amazonaws.com
+    Logging into 012345678901.dkr.ecr.eu-west-1 as osc
+    Login Succeeded
 
+### Images
 
-## login
+Config:
 
-Login to ECS Docker repo
+    images:
+        myImage:
+            repository    : myImageB
+            context       : ./
+            dockerfile    : ./Dockerfile
+            build_requires:
+                - MYENVVAR
+Allows:
+
+    $ adet images build myImageB
+
+Or:
+
+    $ adet images pull myImageB
+
+And:
+
+    $ adet images push myImageB
+
+### Tasks
+
+Config:
+
+    tasks:
+        myImageT:
+            image: myImageB
+            environment:
+                - name: foobar
+                  value: baz1
+            dev_mount:
+                - ./:/opt/mycode
+                - /some/path:/opt/path
+        ports:
+            - 3000:5000
+
+Allows:
+
+    $ adet compose [any command docker-compose accepts]
+
+With the addition of:
+
+    $ adet compose shell myImageT
+
+### Services
+
+Config:
+
+    services:
+        myService:
+            task: myImageT
+            desired: 2
+
+Allows:
+
+    $ adet deploy_service myService
 
 # LICENSE AND COPYRIGHT
 

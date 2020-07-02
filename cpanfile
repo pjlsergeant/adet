@@ -1,8 +1,11 @@
+requires 'Config::INI::Reader';
 requires 'Class::ConfigHash';
 requires 'Cwd';
+requires 'Cwd::Guard';
 requires 'File::Temp';
 requires 'Moo';
 requires 'MooX::Cmd';
 requires 'MooX::Options';
+requires 'Path::Class';
 requires 'strictures';
 requires 'YAML';

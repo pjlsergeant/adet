@@ -1,32 +1,24 @@
-#!perl
-
-#
-# Docker login commands that are aware of the AWS version.
-#
-
-package App::adet::Cmd::Login;
+package App::adet::Command::Login;
 
 use Moo;
-use MooX::Cmd;
-use MooX::Options;
+extends 'App::adet::Command';
 
-with 'App::adet::ProjectConfig::File';
-with 'App::adet::OptionOrDefault';
+sub run {
+    my $self = shift;
 
-sub execute {
-    my ( $self, $args, $chain ) = @_;
+    my $aws_profile = $self->options->value('aws_profile');
+    my $aws_cli     = $self->options->value('aws_cli');
+    my $registry    = $self->project->registry;
 
-    my $aws_profile = $self->value('aws_profile');
-    my $aws_cli     = $self->value('aws_cli') // 'aws';
+    my ($region) = $registry =~ m/\d+\.dkr\.ecr\.(.+)\.amazonaws\.com/;
+    die "Unknown region from registry [$registry]" unless $region;
 
+    $self->log_cb->( 1, "Checking AWS command-line version");
     my $raw_version = `$aws_cli --version`;
     my ($big_version) = $raw_version =~ m!^aws-cli/(\d+)\.!;
     die "Unknown version: [$raw_version]"
         unless $big_version == 1 || $big_version == 2;
-
-    my $registry = $self->project_config->registry;
-    my ($region) = $registry =~ m/\d+\.dkr\.ecr\.(.+)\.amazonaws\.com/;
-    die "Unknown region from registry [$registry]" unless $region;
+    $self->log_cb->( 1, "Version: $big_version");
 
     my $login_command;
     my $print_command;
@@ -62,7 +54,6 @@ sub execute {
 
     print "$print_command\n";
     exec $login_command;
-
 }
 
 1;

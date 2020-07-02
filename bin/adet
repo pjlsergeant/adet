@@ -3,6 +3,10 @@
 use strict;
 use warnings;
 use lib 'lib';
+use lib '../adet/lib';
 
 use App::adet;
-App::adet->new_with_cmd;
+use App::adet::UI::cmdline;
+
+my $ui = App::adet::UI::cmdline->create( \@ARGV, \%ENV );
+App::adet->run( $ui );

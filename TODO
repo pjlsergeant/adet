@@ -1,0 +1,75 @@
+
+
+
+
++ Check I can get the build command working
+- Add logging
+- Start writing tests
+- Argument checking
+- Usage info
+- allow multiple --env flags
+- Allow images themselves to have env coded
+- Allow fetching env from aws_profile
+
+
+
+
+
+
+
++ You've now got "Options" for both env and options
+- Instantiate a runtime using that
+- Clean up the UI bit to handle exits, etc
+
+
+UI
+    - Responsible for reading from the environment
+        - ARGV
+        - ENV
+        - Also needs to be able to disambiguate command vs options
+
+    - Responsible for outputting to the environment
+        - Logging output
+        - Exits / dies
+
+
+TODO:
+    - Write a whole example project
+
+    - Finish `images build`
+    - Finish `compose x`
+    - Add proper logging levels in terms of showing command outputs or not
+    - Finish port of `thrive`, check it's deployable
+    - Finish port of `bb_project`, check it's still deployable
+    - Write tests
+    - Useful to have an adet.yaml and adet-user.yaml?
+    - Make command-line options work like you expect
+    - Make the temp docker-compose file more secure
+    - Write more documentation
+    - More properly model the format of the projectconfig file into a Model class
+        with a reliable interface that's separate from the YAML versions
+
+
+
+
+What I need is:
+
+
+    The Invocation / UI pattern is good
+    The options should really be their own data-only module
+    The Runtime module is where the magic happens I guess? I want a nicer name than runtime
+    I want a singleton "exit" so I don't need to pass that around
+    Runtime options should really explain where they came from
+
+
+    You have:
+        - options
+        - megaenv
+        - project
+
+    all of which have difference places they can be specified, and one
+    of which is self-referential
+
+    Options -- runtime options
+    Megaenv -- Environment to pass to container build
+    Project -- tasks, etc
