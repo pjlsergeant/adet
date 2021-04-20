@@ -1,0 +1,15 @@
+
++ Add a version command, and hook it up to the cmd-line
++ Centralize all commands and options
++ Check commands only get the right arguments
+- Read in the projectfile
+- Get login working with configurable AWS version
+- Move fact-stores to be "::Fact::"
+- Write decent tests for everything so far
+- Add help text
+- Add images commands
+    - pull
+    - push
+    - build
+- Add compose
+- Add tasks and services

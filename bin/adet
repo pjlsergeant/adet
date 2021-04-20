@@ -1,0 +1,14 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use lib 'lib';
+
+use App::adet::UI::cmdline;
+use App::adet::Runtime;
+
+App::adet::Runtime->new(
+    ui   => App::adet::UI::cmdline->new(),
+    argv => [@ARGV],
+    env  => {%ENV}
+)->run;
